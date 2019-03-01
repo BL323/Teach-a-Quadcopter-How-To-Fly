@@ -1,3 +1,5 @@
+# define task
+
 import numpy as np
 from physics_sim import PhysicsSim
 
@@ -25,11 +27,40 @@ class Task():
 
         # Goal
         self.target_pos = target_pos if target_pos is not None else np.array([0., 0., 10.]) 
+    
+    def get_reward(self):        
+        # try implementing eculidean distance to get reward
+        cur_x, cur_y, cur_z = self.sim.pose[:3]
+        tar_x, tar_y, tar_z = self.target_pos
+                
+        reward = 0
+        penalties = 0
+        
+        # calculate differences from target  
+        x_distance = abs((cur_x - tar_x)) ** 2
+        y_distance = abs((cur_y - tar_y)) ** 2
+        z_distance = abs((cur_z - tar_z)) ** 2        
+        
+        # distance from target
+        distance = np.sqrt(x_distance + y_distance + z_distance)
+        
+        # calculate reasonable proximity from target, 
+        # start with 30% region around target (assumes starting from origin)
+        target = abs(tar_x) + abs(tar_y) + abs(tar_z)         
+        proximity = target * 0.30
+         
+        if (distance < proximity):
+            # find % distance from position relative to proximity       
+            proportion = 1 - min((distance / proximity), 1.0)
+            # reward becomes greater as the agent approaches target
+            reward += (200 * proportion)
 
-    def get_reward(self):
-        """Uses current pose of sim to return reward."""
-        reward = 1.-.3*(abs(self.sim.pose[:3] - self.target_pos)).sum()
-        return reward
+        # penalise large velocities, a smooth flight will produce better results    
+        x_vel, y_vel, v_vel = self.sim.v
+        if(abs(x_vel) > 12.0 or abs(y_vel) > 12.0 or abs(v_vel) > 12.0):
+            penalties += 20
+        
+        return (reward - penalties)
 
     def step(self, rotor_speeds):
         """Uses action to obtain next state, reward, done."""
